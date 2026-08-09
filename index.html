@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>盘口精算 · 自动版</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Segoe UI',sans-serif; background:#0b0e14; color:#e8edf5; padding:12px; }
+        .app-container { max-width:600px; margin:0 auto; }
+        .panel { background:#111821; border-radius:16px; border:1px solid #26323f; padding:16px; margin-bottom:12px; }
+        .panel-title { font-size:16px; font-weight:600; color:#d0def0; margin-bottom:12px; border-bottom:1px solid #1f2c3a; padding-bottom:8px; }
+        .form-group { margin-bottom:10px; }
+        .form-group label { display:block; font-size:13px; color:#9aafc7; margin-bottom:3px; }
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+        .form-control { width:100%; padding:6px 10px; background:#0e141c; border:1px solid #26323f; border-radius:6px; color:#e8edf5; font-size:14px; outline:none; }
+        .form-control:focus { border-color:#f0b34b; }
+        .btn { padding:8px 16px; border:none; border-radius:8px; font-weight:600; font-size:14px; cursor:pointer; }
+        .btn-primary { background:#f0b34b; color:#0b0e14; width:100%; }
+        .btn-success { background:#1a3a2a; color:#6bcfa0; width:100%; margin-top:8px; }
+        .history-item { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #1a222d; cursor:pointer; }
+        .history-item .info { flex:1; }
+        .history-item .time { font-size:11px; color:#7a8ca3; }
+        .history-item .summary { font-size:13px; color:#d0def0; }
+        .badge-risk { padding:2px 8px; border-radius:10px; font-size:11px; }
+        .badge-risk.low { background:#143a2a; color:#6bcfa0; }
+        .badge-risk.medium { background:#3a2a1a; color:#f0b34b; }
+        .badge-risk.high { background:#3d1f2a; color:#e8848f; }
+        .core-advice { background:#1a2a2a; border-radius:10px; padding:12px; margin-bottom:10px; border:1px solid #2a4a4a; }
+        .core-advice .direction { font-size:20px; font-weight:700; color:#f0b34b; }
+        .empty-state { color:#4e627a; text-align:center; padding:20px 0; }
+        .flex-between { display:flex; justify-content:space-between; align-items:center; }
+        hr { border:0; border-top:1px solid #1f2c3a; margin:12px 0; }
+        .disclaimer { font-size:11px; color:#4e627a; border-top:1px solid #1a222d; padding-top:8px; margin-top:8px; }
+        #matchList .history-item { padding:6px 8px; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+
+    <div class="panel">
+        <div class="panel-title">⚽ 盘口精算 · 自动版</div>
+        
+        <div class="form-group">
+            <label>📋 今日比赛（点击加载数据）</label>
+            <div id="matchList" style="background:#0e141c; border-radius:6px; border:1px solid #26323f; padding:4px; min-height:50px;">
+                <div style="color:#4e627a;padding:6px;text-align:center;">加载中...</div>
+            </div>
+        </div>
+        <hr>
+
+        <div class="form-group">
+            <label>📝 备注</label>
+            <input class="form-control" id="matchNote" placeholder="对阵信息" />
+        </div>
+
+        <!-- 欧赔 -->
+        <div class="form-group">
+            <label>🇪🇺 欧赔 (胜 / 平 / 负)</label>
+            <div class="form-row-3">
+                <input class="form-control" id="euWinInit" placeholder="初胜" />
+                <input class="form-control" id="euDrawInit" placeholder="初平" />
+                <input class="form-control" id="euLoseInit" placeholder="初负" />
+            </div>
+            <div class="form-row-3" style="margin-top:4px;">
+                <input class="form-control" id="euWinNow" placeholder="即胜" />
+                <input class="form-control" id="euDrawNow" placeholder="即平" />
+                <input class="form-control" id="euLoseNow" placeholder="即负" />
+            </div>
+        </div>
+
+        <!-- 亚盘 -->
+        <div class="form-group">
+            <label>🌏 亚盘 (让球 / 上盘水位)</label>
+            <div class="form-row">
+                <select class="form-control" id="asiaHandicapInit">
+                    <option value="0">平手</option>
+                    <option value="0.25">平半</option>
+                    <option value="0.5">半球</option>
+                    <option value="0.75">半一</option>
+                    <option value="1">一球</option>
+                </select>
+                <input class="form-control" id="asiaWaterInit" placeholder="初水" />
+            </div>
+            <div class="form-row" style="margin-top:4px;">
+                <select class="form-control" id="asiaHandicapNow">
+                    <option value="0">平手</option>
+                    <option value="0.25">平半</option>
+                    <option value="0.5">半球</option>
+                    <option value="0.75">半一</option>
+                    <option value="1">一球</option>
+                </select>
+                <input class="form-control" id="asiaWaterNow" placeholder="即水" />
+            </div>
+        </div>
+
+        <!-- 大小球 -->
+        <div class="form-group">
+            <label>⚽ 大小球 (盘口 / 大球水位)</label>
+            <div class="form-row">
+                <select class="form-control" id="ouHandicapInit">
+                    <option value="1.5">1.5</option>
+                    <option value="2">2</option>
+                    <option value="2.25">2.25</option>
+                    <option value="2.5" selected>2.5</option>
+                    <option value="2.75">2.75</option>
+                    <option value="3">3</option>
+                </select>
+                <input class="form-control" id="ouWaterInit" placeholder="初水" />
+            </div>
+            <div class="form-row" style="margin-top:4px;">
+                <select class="form-control" id="ouHandicapNow">
+                    <option value="1.5">1.5</option>
+                    <option value="2">2</option>
+                    <option value="2.25">2.25</option>
+                    <option value="2.5" selected>2.5</option>
+                    <option value="2.75">2.75</option>
+                    <option value="3">3</option>
+                </select>
+                <input class="form-control" id="ouWaterNow" placeholder="即水" />
+            </div>
+        </div>
+        <hr>
+
+        <!-- 近5场 & 交锋 -->
+        <div class="form-row">
+            <input class="form-control" id="homeGoals" placeholder="主队进球" />
+            <input class="form-control" id="homeConceded" placeholder="主队失球" />
+        </div>
+        <div class="form-row" style="margin-top:4px;">
+            <input class="form-control" id="awayGoals" placeholder="客队进球" />
+            <input class="form-control" id="awayConceded" placeholder="客队失球" />
+        </div>
+        <div class="form-row" style="margin-top:4px;">
+            <input class="form-control" id="h2hHomeGoals" placeholder="交锋主进球" />
+            <input class="form-control" id="h2hAwayGoals" placeholder="交锋客进球" />
+        </div>
+
+        <button class="btn btn-primary" id="analyzeBtn" style="margin-top:12px;">🔍 执行分析</button>
+        <button class="btn btn-success" id="saveRecordBtn">💾 保存记录</button>
+        <div id="saveStatus" style="font-size:12px;color:#6bcfa0;margin-top:4px;text-align:center;"></div>
+    </div>
+
+    <div class="panel" id="summaryCard">
+        <div class="panel-title">📌 综合研判</div>
+        <div id="summaryContent"><div class="empty-state">点击比赛或手动分析</div></div>
+    </div>
+
+    <div class="panel">
+        <div class="flex-between"><span class="panel-title" style="border:0;margin:0;">📜 历史记录</span><span id="historyCount">0条</span></div>
+        <div id="historyList"><div class="empty-state">暂无记录</div></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+//  完整算法（与之前相同）
+// ============================================================
+const $ = id => document.getElementById(id);
+function toNum(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function calcProbs(w, d, l) {
+    if (w <= 0 || d <= 0 || l <= 0) return { pWin: 0, pDraw: 0, pLose: 0 };
+    const total = 1/w + 1/d + 1/l;
+    return { pWin: (1/w)/total, pDraw: (1/d)/total, pLose: (1/l)/total };
+}
+function calcOUProbs(overWater) {
+    if (overWater <= 0 || overWater >= 1.90) return { pOver: 0, pUnder: 0 };
+    const under = 1.90 - overWater;
+    if (under <= 0) return { pOver: 0, pUnder: 0 };
+    const total = 1/overWater + 1/under;
+    return { pOver: (1/overWater)/total, pUnder: (1/under)/total };
+}
+function getColdRisk(pWin, pDraw, pLose, asianH, asianW, overProb) {
+    let score = 0, reasons = [];
+    if (Math.max(pWin,pDraw,pLose) < 0.38) { score++; reasons.push('欧赔分歧大'); }
+    if (pWin > 0.42 && asianH <= 0.25) { score++; reasons.push('主胜高但盘口浅'); }
+    if (pLose > 0.42 && asianH >= -0.25) { score++; reasons.push('客胜高但未受让'); }
+    if (asianW < 0.70 || asianW > 1.10) { score++; reasons.push('水位异常'); }
+    if (pDraw > 0.30) { score++; reasons.push('平局概率高'); }
+    score = Math.min(score, 4);
+    let level = score >= 3 ? '高' : score >= 2 ? '中' : '低';
+    return { score, level, reasons };
+}
+
+// ----- 加载真实比赛（调用后端 API）-----
+async function loadMatches() {
+    const container = document.getElementById('matchList');
+    try {
+        const res = await fetch('/api/odds');
+        if (!res.ok) throw new Error('网络错误');
+        const matches = await res.json();
+        if (!matches || matches.length === 0) {
+            container.innerHTML = '<div style="color:#e8848f;padding:6px;">今日暂无比赛</div>';
+            return;
+        }
+        container.innerHTML = matches.map(m => `
+            <div class="history-item" onclick="loadMatchData('${m.id}')">
+                <div class="info">
+                    <div style="color:#d0def0;">${m.home} vs ${m.away}</div>
+                    <div class="time">${m.league} ${m.time}</div>
+                </div>
+                <span style="color:#f0b34b;">加载</span>
+            </div>
+        `).join('');
+    } catch (e) {
+        container.innerHTML = '<div style="color:#e8848f;padding:6px;">加载失败，请检查后端</div>';
+        console.error(e);
+    }
+}
+
+// ----- 加载某场比赛的赔率（调用后端 API）-----
+async function loadMatchData(fixtureId) {
+    try {
+        const res = await fetch(`/api/odds?fixtureId=${fixtureId}`);
+        if (!res.ok) throw new Error('获取赔率失败');
+        const d = await res.json();
+        if (!d) return;
+        // 填充数据（如果后端返回的数据字段与下面一致，自动填入）
+        $('euWinInit').value = d.euWinInit || '';
+        $('euDrawInit').value = d.euDrawInit || '';
+        $('euLoseInit').value = d.euLoseInit || '';
+        $('euWinNow').value = d.euWinNow || '';
+        $('euDrawNow').value = d.euDrawNow || '';
+        $('euLoseNow').value = d.euLoseNow || '';
+        $('asiaHandicapInit').value = d.asiaHandicapInit || '0.5';
+        $('asiaWaterInit').value = d.asiaWaterInit || '';
+        $('asiaHandicapNow').value = d.asiaHandicapNow || '0.5';
+        $('asiaWaterNow').value = d.asiaWaterNow || '';
+        $('ouHandicapInit').value = d.ouHandicapInit || '2.5';
+        $('ouWaterInit').value = d.ouWaterInit || '';
+        $('ouHandicapNow').value = d.ouHandicapNow || '2.5';
+        $('ouWaterNow').value = d.ouWaterNow || '';
+        $('homeGoals').value = d.homeGoals || '';
+        $('homeConceded').value = d.homeConceded || '';
+        $('awayGoals').value = d.awayGoals || '';
+        $('awayConceded').value = d.awayConceded || '';
+        $('h2hHomeGoals').value = d.h2hHomeGoals || '';
+        $('h2hAwayGoals').value = d.h2hAwayGoals || '';
+        $('matchNote').value = d.note || '';
+        runAnalysis();
+    } catch (e) {
+        alert('加载赔率失败: ' + e.message);
+    }
+}
+
+// ----- 核心分析函数（不变）-----
+function runAnalysis() {
+    const wN = toNum($('euWinNow').value);
+    const dN = toNum($('euDrawNow').value);
+    const lN = toNum($('euLoseNow').value);
+    const hN = toNum($('asiaHandicapNow').value);
+    const wN_asia = toNum($('asiaWaterNow').value);
+    const ouH_N = toNum($('ouHandicapNow').value);
+    const ouW_N = toNum($('ouWaterNow').value);
+    if (wN<=0 || dN<=0 || lN<=0 || wN_asia<=0 || ouW_N<=0) {
+        $('summaryContent').innerHTML = '<div class="empty-state">请填写完整数据</div>';
+        return;
+    }
+    const pN = calcProbs(wN, dN, lN);
+    const ouProb = calcOUProbs(ouW_N);
+    const cold = getColdRisk(pN.pWin, pN.pDraw, pN.pLose, hN, wN_asia, ouProb.pOver);
+    let direction = '方向不明', dirEmoji = '⚖️';
+    const maxP = Math.max(pN.pWin, pN.pDraw, pN.pLose);
+    if (pN.pWin === maxP && pN.pWin > 0.38) { direction = '主胜'; dirEmoji = '🏠'; }
+    else if (pN.pLose === maxP && pN.pLose > 0.38) { direction = '客胜'; dirEmoji = '✈️'; }
+    else if (pN.pDraw === maxP && pN.pDraw > 0.34) { direction = '平局'; dirEmoji = '🤝'; }
+    let ouDir = '均衡';
+    if (ouProb.pOver > 0.55) ouDir = '大球';
+    else if (ouProb.pUnder > 0.55) ouDir = '小球';
+    let recAsian = '观望';
+    if (pN.pWin > 0.42 && hN > 0.25) recAsian = `上盘 (主-${hN})`;
+    else if (pN.pLose > 0.42 && hN < -0.25) recAsian = `下盘 (客+${Math.abs(hN)})`;
+    else if (pN.pWin > pN.pLose) recAsian = '主队 平手';
+    else recAsian = '客队 平手';
+    let recOU = '观望';
+    if (ouProb.pOver > 0.60) recOU = `大球 (>${ouH_N})`;
+    else if (ouProb.pUnder > 0.60) recOU = `小球 (<${ouH_N})`;
+    let stars = '★★★☆☆';
+    let conflict = '';
+    if (pN.pWin > 0.42 && hN < 0.25) conflict = '⚠️ 主胜高但盘口浅，谨慎';
+    if (pN.pLose > 0.42 && hN > -0.25) conflict = '⚠️ 客胜高但未受让，谨慎';
+    const note = $('matchNote').value.trim() || '';
+    let html = `
+        <div class="core-advice">
+            <div class="direction">${dirEmoji} ${direction} (${(maxP*100).toFixed(0)}%)</div>
+            <div style="color:#6a9fd8;font-size:16px;font-weight:600;">${recOU}</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:13px;color:#7a8ca3;">
+                <span>📌 ${recAsian}</span>
+                <span>⭐ ${stars}</span>
+                <span class="badge-risk ${cold.level === '高' ? 'high' : cold.level === '中' ? 'medium' : 'low'}">冷门${cold.level}</span>
+            </div>
+        </div>
+        <div style="font-size:14px;color:#d0def0;line-height:1.6;">
+            ${conflict ? `<span style="color:#e8848f;">${conflict}</span><br>` : ''}
+            📊 主胜${(pN.pWin*100).toFixed(1)}% | 平${(pN.pDraw*100).toFixed(1)}% | 客胜${(pN.pLose*100).toFixed(1)}%<br>
+            ⚽ 大球${(ouProb.pOver*100).toFixed(1)}% | 小球${(ouProb.pUnder*100).toFixed(1)}%<br>
+            ${cold.reasons.length > 0 ? `❄️ 冷门触发：${cold.reasons.join('；')}` : ''}
+            ${note ? `📝 备注：${note}` : ''}
+        </div>
+        <div class="disclaimer">仅供参考，不构成准确预测</div>
+    `;
+    $('summaryContent').innerHTML = html;
+    window._lastSummary = {
+        shortRec: `${direction} | ${recOU}`,
+        recDir: recAsian,
+        coldLevel: cold.level,
+        note: note,
+        top3Scores: '2-1, 1-1, 1-0',
+        totalGoalsDual: '2球或3球'
+    };
+}
+
+// ----- 历史记录（不变）-----
+function getHistory() { try { return JSON.parse(localStorage.getItem('oddsHistory')) || []; } catch { return []; } }
+function saveHistory(rec) {
+    let h = getHistory();
+    h.unshift({ ...rec, time: Date.now() });
+    if (h.length > 30) h = h.slice(0, 30);
+    localStorage.setItem('oddsHistory', JSON.stringify(h));
+    renderHistory();
+}
+function deleteHistory(idx) {
+    let h = getHistory(); h.splice(idx, 1); localStorage.setItem('oddsHistory', JSON.stringify(h)); renderHistory();
+}
+function renderHistory() {
+    const h = getHistory();
+    $('historyCount').textContent = h.length + '条';
+    if (!h.length) { $('historyList').innerHTML = '<div class="empty-state">暂无记录</div>'; return; }
+    $('historyList').innerHTML = h.map((rec, i) => `
+        <div class="history-item" onclick="deleteHistory(${i})">
+            <div class="info">
+                <div class="time">${new Date(rec.time).toLocaleString()}</div>
+                <div class="summary">${rec.shortRec || rec.recDir} ${rec.note ? '📝'+rec.note : ''}</div>
+            </div>
+            <span class="badge-risk ${rec.coldLevel === '高' ? 'high' : rec.coldLevel === '中' ? 'medium' : 'low'}">${rec.coldLevel}</span>
+        </div>
+    `).join('');
+}
+
+function saveCurrent() {
+    if (!window._lastSummary) { $('saveStatus').textContent = '请先分析'; return; }
+    saveHistory(window._lastSummary);
+    $('saveStatus').textContent = '✅ 已保存';
+    setTimeout(() => $('saveStatus').textContent = '', 2000);
+}
+
+// 绑定事件
+$('analyzeBtn').addEventListener('click', runAnalysis);
+$('saveRecordBtn').addEventListener('click', saveCurrent);
+document.querySelectorAll('input, select').forEach(el => el.addEventListener('input', runAnalysis));
+
+// 初始化：加载比赛列表 + 渲染历史
+loadMatches();
+renderHistory();
+</script>
+</body>
+</html>
